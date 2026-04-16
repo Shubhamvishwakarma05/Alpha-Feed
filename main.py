@@ -195,9 +195,9 @@ with st.sidebar:
     # Topic Input with Placeholder Hint
     topics_raw = st.text_area(
         "Targets",
-        value="Artificial Intelligence\nStock Market\nIndian Startups",
-        height=150,
-        placeholder="Yahan apne topics likhein (Example: Cricket, SpaceX, Tesla)..."
+        value="Stock Market\nIndian Startups",
+        height=140,
+        placeholder="Yahan apne topics likhein jinki news chahiye(Example: Cricket, SpaceX, Tesla)..."
     )
 
     articles_per_topic = st.slider("Signal Density", 3, 10, 5)
