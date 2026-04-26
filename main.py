@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
+import smtplib
 from datetime import datetime
+from email.message import EmailMessage
 from groq import Groq
 
 # ─────────────────────────────────────────────
@@ -186,20 +188,34 @@ def generate_alpha_audio(text: str, voice_id: str):
         return None
 
 
+def send_alpha_email(report_text, receiver_email):
+    msg = EmailMessage()
+    msg.set_content(
+        f"🐺 ALPHA INTELLIGENCE REPORT\n{'=' * 30}\n\n{report_text}\n\n{'=' * 30}\nSent via Alpha Feed Agent")
+    msg['Subject'] = f"🐺 ALPHA INTEL | {datetime.now().strftime('%d %b %Y')}"
+    msg['From'] = st.secrets["EMAIL_USER"]
+    msg['To'] = receiver_email
+
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(st.secrets["EMAIL_USER"], st.secrets["EMAIL_PASS"])
+            smtp.send_message(msg)
+        return True
+    except Exception as e:
+        return False
+
+
 # ─────────────────────────────────────────────
 #  SIDEBAR
 # ─────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 🐺 News Controls")
-
-    # Topic Input with Placeholder Hint
     topics_raw = st.text_area(
         "Targets",
-        value="Stock Market\nIndian Startups",
-        height=140,
-        placeholder="Yahan apne topics likhein jinki news chahiye(Example: Cricket, SpaceX, Tesla)..."
+        value="Artificial Intelligence\nStock Market\nIndian Startups",
+        height=150,
+        placeholder="Yahan apne topics likhein (Example: Cricket, SpaceX, Tesla)..."
     )
-
     articles_per_topic = st.slider("Signal Density", 3, 10, 5)
 
     st.markdown("---")
@@ -239,13 +255,31 @@ if 'summaries' in st.session_state:
         """, unsafe_allow_html=True)
         combined_summary_text += f" News for {topic}. {summary} "
 
+    # ─── DISPATCH UI (Updated) ───
     st.markdown('<div style="padding: 0 20px;">', unsafe_allow_html=True)
-    if st.button("🔊 PLAY AUDIO REPORT"):
-        with st.spinner("🎙️ Generating..."):
-            audio_path = generate_alpha_audio(combined_summary_text, selected_voice_id)
-            if audio_path:
-                st.audio(audio_path, format="audio/wav", autoplay=True)
+
+    col_audio, col_email = st.columns([1, 1.5])
+
+    with col_audio:
+        st.markdown("### 🔊 Audio Feed")
+        if st.button("PLAY AUDIO REPORT"):
+            with st.spinner("🎙️ Generating..."):
+                audio_path = generate_alpha_audio(combined_summary_text, selected_voice_id)
+                if audio_path:
+                    st.audio(audio_path, format="audio/wav", autoplay=True)
+
+    with col_email:
+        st.markdown("### 📧 Email Dispatch")
+        email_target = st.text_input("Enter Receiver Email", value="user@example.com")
+        if st.button("🚀 DISPATCH TO MAIL"):
+            with st.spinner("📤 Sending intelligence..."):
+                if send_alpha_email(combined_summary_text, email_target):
+                    st.success(f"✅ Intelligence sent to {email_target}")
+                else:
+                    st.error("❌ Dispatch failed! Verify Secrets.")
+
     st.markdown('</div>', unsafe_allow_html=True)
+    # ─── End of Dispatch UI ───
 
     st.markdown(
         '<div style="color:#ffa500; font-weight:700; letter-spacing:4px; font-size:0.8rem; margin-top:50px; margin-bottom:20px; padding: 0 20px;">📰 DISCOVER FEED</div>',
@@ -273,6 +307,41 @@ if 'summaries' in st.session_state:
                 """, unsafe_allow_html=True)
             idx += 1
     st.markdown('</div>', unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────
+#  ALPHA INTELLIGENCE AGENT (The Brain)
+# ─────────────────────────────────────────────
+st.markdown("---")
+st.markdown("<h2 style='text-align:center;'>🐺 CONSULT ALPHA AGENT</h2>", unsafe_allow_html=True)
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Display History
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+if prompt := st.chat_input("Analyze today's intelligence..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        client = Groq(api_key=GROQ_API_KEY)
+        context_data = ""
+        if 'news' in st.session_state:
+            for topic, arts in st.session_state['news'].items():
+                context_data += f"\nTopic: {topic}\n" + "\n".join([f"- {a['title']}" for a in arts[:3]])
+
+        system_prompt = f"You are ALPHA AGENT. Context: {context_data}. Be sharp and insightful."
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "system", "content": system_prompt}] + st.session_state.messages
+        )
+        ans = response.choices[0].message.content
+        st.markdown(ans)
+    st.session_state.messages.append({"role": "assistant", "content": ans})
 
 # ─────────────────────────────────────────────
 #  PROFESSIONAL FOOTER
